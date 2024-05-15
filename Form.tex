@@ -1,0 +1,61 @@
+\documentclass[12pt]{article}
+
+
+% Preamble
+\setlength{\parindent}{0pt}
+
+% Document Information
+\title{Optimal Method of Ray Tracing Voxels with Hardware Acceleration in Real-Time}
+\author{Srijan Dhungana}
+\date{2024}
+
+
+
+% Begin Document
+\begin{document}
+
+% Title Page
+\maketitle
+\clearpage
+
+% Table of Contents
+\tableofcontents
+\clearpage
+
+% Introduction
+\section{Introduction}
+
+Ray tracing is a method to calculate where a given ray (line), intersects with the environment.
+This is useful to simulate light rays.
+It is used in film production, video games, optics, medical imaging, architectural visualization, and many other fields.
+Light rays bounce in the environment, thus ray tracing is used to calculate the position of intersection where a light ray hits the environment. 
+Then the programmer is free to repeat the process and simulate the ray bouncing off into other directions.
+This process is a highly parallelizable process, thus it is perfectly suited for GPUs which have thousands of cores.
+However, due to how computationally expensive the process is, it is not feasible to do in real-time without dedicated hardware acceleration.
+Due to those limitations, it was only used in non-real-time applications such as film production and pre-rendered graphics.
+
+\bigskip
+
+Hardware acceleration ray tracing was introduced in 2018 by Nvidia.
+Since then, ray tracing has been possible in real-time and supported by AMD and Intel GPUs.
+This has allowed real-time applications to leverage ray-tracing for realistic lighting, reflections, and shadows.
+
+
+
+\section{Background Information}
+\subsection{Mathematics of Ray Tracing}
+\subsection{GPU Architecture}
+
+\section{Methods}
+\subsection{Hardware BVH Traversal}
+\subsection{Signed Distance Fields}
+\subsection{Other Algorithms}
+
+\section{Memory Consumption}
+
+\section{Results}
+
+\section{Conclusion}
+
+
+\end{document}

@@ -1,0 +1,15 @@
+# Text Editor
+*.code-workspace
+
+# LaTeX build
+*.acn
+*.glo
+*.glsdefs
+*.ist
+*.nav
+*.pdf
+*.snm
+*.synctex.gz
+*.fls
+
+
