@@ -11,5 +11,9 @@
 *.snm
 *.synctex.gz
 *.fls
+*.fdb_latexmk
+*.toc
+*.aux
+*.log
 
 
