@@ -25,20 +25,43 @@
 % Introduction
 \section{Introduction}
 
-Ray tracing is a method to calculate where a given ray (line), intersects with the environment.
-This is useful to simulate light rays.
-It is used in film production, video games, optics, medical imaging, architectural visualization, and many other fields.
-Light rays bounce in the environment, thus ray tracing is used to calculate the position of intersection where a light ray hits the environment. 
-Then the programmer is free to repeat the process and simulate the ray bouncing off into other directions.
-This process is a highly parallelizable process, thus it is perfectly suited for GPUs which have thousands of cores.
-However, due to how computationally expensive the process is, it is not feasible to do in real-time without dedicated hardware acceleration.
-Due to those limitations, it was only used in non-real-time applications such as film production and pre-rendered graphics.
+\subsection{Ray Tracing}
 
-\bigskip
+Ray tracing is a method to calculate where a given ray (line), intersects
+with the environment. This is useful to simulate light rays. It is used in film
+production, video games, optics, medical imaging, architectural visualization,
+and many other fields. In physics, light rays bounce in the environment, thus
+ray tracing is used to calculate the position of intersection where a light ray
+hits the environment. Then the programmer is free to repeat the process
+and simulate the ray bouncing off into other directions. This process is a
+highly parallelizable process, thus it is perfectly suited for GPUs which have
+thousands of cores. However, due to how computationally expensive the
+process is, it is not feasible to do in real-time without dedicated hardware
+acceleration. Due to those limitations, it was only used in non-real-time
+applications such as film production and pre-rendered graphics. Hardware
+acceleration ray tracing was introduced in 2018 by Nvidia. Since then, ray
+tracing has been possible in real-time and further supported by AMD and
+Intel GPUs. This has allowed real-time applications to leverage ray-tracing
+for realistic lighting, reflections, and shadows.
 
-Hardware acceleration ray tracing was introduced in 2018 by Nvidia.
-Since then, ray tracing has been possible in real-time and supported by AMD and Intel GPUs.
-This has allowed real-time applications to leverage ray-tracing for realistic lighting, reflections, and shadows.
+\subsection{Voxels}
+
+Voxels are a way to represent 3D data. It is similar to pixels in 2D images,
+but in 3D space. Essentially, voxels are cubes that are located in 3D space.
+They are used in medical imaging, simulations, and video games; they have
+similar applications to ray tracing. Voxels are convenient, because they rep-
+resent volumetric data, which is difficult to represent with polygons. For
+example, a physics simulation of a fluid would be difficult to represent with
+polygons, but easy with voxels. Each voxel can store data such as color,
+density, temperature, etc. at each point in 3D space. The resolution of the
+simulation can also be adjusted easily just by changing the size of the voxels.
+
+\subsection{Research Question}
+
+The research question is: What is the difference in performance between
+purely hardware based voxel ray tracing and a mixed software-hardware ap-
+proach?
+3
 
 
 
