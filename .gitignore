@@ -15,5 +15,7 @@
 *.toc
 *.aux
 *.log
-
-
+*.bcf
+*.bbl
+*.blg
+*.run.xml
