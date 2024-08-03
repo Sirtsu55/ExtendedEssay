@@ -4,6 +4,7 @@
 \graphicspath{ {./images/} }
 
 \addbibresource{figures.bib}
+\addbibresource{references.bib}
 
 % Preamble
 \setlength{\parindent}{0pt}
@@ -188,7 +189,7 @@ It is inefficient and wasteful to have two copies of the same data in memory.
 \end{figure}
 
 There are caveats to using hardware acceleration for voxel ray tracing.
-The GPU does not solve for the closest intersection for AABBs, instead it only tells the user if there is a potential hit.
+The GPU does not solve for the closest intersection for AABBs, instead it only tells the user if there is a potential hit \parencite{DirectX:Specification}.
 Closest hit has to be solved by the user, since the GPU expects the enclosed object to have a different surface than the AABB.
 It is obvious that the GPU is not optimized for voxel ray tracing.
 However, the GPU provides a transformation matrix that stores the location of the AABB.
