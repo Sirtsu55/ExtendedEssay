@@ -33,7 +33,6 @@ I have always been fascinated by the aesthetics of voxels based games and I want
 However, when researching, I found that there was not much information on the fastest method to ray trace a voxel scene with hardware acceleration.
 This essay is an attempt to answer that question.
 
-% Introduction
 \section{Introduction}
 
 \subsection{Ray Tracing}
@@ -84,7 +83,7 @@ A ray is defined by a point and a direction. The equation of a ray is given by:
 
 where $\vec{o}$ is the origin of the ray, $\vec{d}$ is the direction of the ray, and $t$ is the distance from the origin.
 The function $R(t)$ gives the position of the ray at distance $t$ from the origin.
-With this equation, we can start to calculate the point of intersection along the ray with a surface.
+With this equation, any point along the ray can calculated.
 
 \subsubsection{The Intersection Function}
 
@@ -105,9 +104,12 @@ This is computationally expensive for large scenes, so acceleration structures (
 These structures are usually bounding volume hierarchies (BVH) that subdivide the scene into smaller parts until the smallest primitives are reached.
 
 \begin{figure}[h]
-\includegraphics[scale=0.22]{BVH-Visualization}
-\caption{Bounding Volume Hierarchy of a bunny form \parencite{Medium:BVH-Visualization}. The bunny is divided into smaller bounding volumes until the individual triangles are reached.}
-
+    \includegraphics[scale=0.22]{BVH-Visualization}
+    \caption{
+        Bounding Volume Hierarchy of a bunny. 
+        The bunny is divided into smaller bounding volumes until the individual triangles are reached.
+        \parencite{Medium:BVH-Visualization}}
+    \label{fig:BVH-Visualization}
 \end{figure}
 
 When a ray enters a bounding volume, the algorithm only has to test for intersections with the objects in that volume, which is much efficient.
@@ -142,9 +144,12 @@ Even then, the image is an approximation because the algorithm fails to simulate
 
 \subsection{GPU Architecture}
 
-TODO: Explain how GPUs work and how they are used in ray tracing. Also some 3D vs 1D for SDFs maybe?
+% TODO: Explain how GPUs work and how they are used in ray tracing. Also some 3D vs 1D for SDFs maybe?
 
 \section{Methods}
+
+Below are the two methods that will be compared in this essay.
+
 \subsection{Hardware Acceleration Structure Traversal}
 
 To use an AS it needs to be constructed for the objects in the scene.
@@ -165,9 +170,65 @@ densely packed AABBs in a scene.
 
 Additionally, the memory consumption is greater for AABBs than for voxels.
 AABBs need 2, 3D vectors to represent the minimum and maximum points of the cuboid.
+This is 6 floats or 24 bytes per AABB.
+If there is a scene with 1 million voxels, then the memory consumption would be 24MB.
+This may not sound like much, however the AS has extra AABBs for the hierarchy, which will add upto more memory.
+To do lighting calculations and other operations, the user would need to access the data inside the voxels.
+The graphics API does not allow accessing the data inside the AS, so the user would have to duplicate the data in memory.
+It is inefficient and wasteful to have two copies of the same data in memory.
+
+\begin{figure}[h]
+    \begin{center}
+        \includegraphics[scale=0.22]{ClosestHit-Approx}
+    \end{center}
+    \caption{
+        Solving for closest hit candidate without an intersection test.
+        Instead the distance from the ray origin to the AABB is calculated and the closest candidate is selected.}
+    \label{fig:ClosestHit-Approx}
+\end{figure}
+
+There are caveats to using hardware acceleration for voxel ray tracing.
+The GPU does not solve for the closest intersection for AABBs, instead it only tells the user if there is a potential hit.
+Closest hit has to be solved by the user, since the GPU expects the enclosed object to have a different surface than the AABB.
+It is obvious that the GPU is not optimized for voxel ray tracing.
+However, the GPU provides a transformation matrix that stores the location of the AABB.
+Since expensive intersection tests should be avoided, instead of solving for the intersection, only the distance from the ray origin to the potential AABB can be calculated.
+Figure \ref{fig:ClosestHit-Approx} shows solving for the closest candiate without an intersection test.
+This much more efficient than solving for the intersection and it ensures the closest candidate is chosen.
+After finding the closest candidate, the user can solve for the intersection and determine where the ray hits the voxel.
 
 
 \subsection{Signed Distance Fields}
+
+Signed distance fields (SDF) used to store distance information to the nearest surface. 
+SDFs work like LiDAR, where the sensor measures the distance to the nearest surface to map out the environment.
+SDFs are used in ray marching which is a technique to render surfaces. 
+Ray marching is a technique where the ray is stepped in small increments and the distance to the nearest surface is calculated.
+If the distance is less than a threshold, then the ray has hit the surface, this avoids expensive intersection tests for every object in the scene.
+However, the ray has to take steps through the scene which can add up to thousands of steps for a single ray.
+This may have worse performance if the signed distance field cannot skip large emptry spaces in the scene, thus
+requiring more steps to reach the surface.
+
+\begin{figure}[h]
+    \begin{center}
+        \includegraphics[scale=0.22]{Voxel-SDF}
+    \end{center}
+    \caption{
+        2D visualization of a SDF. The black areas are empty space and store a positive distance to the nearest surface.
+        The white areas are the surface thus store 0 as their distance to the nearest surface.
+        \parencite{ByteWrangler:Voxel-SDF}}
+    \label{fig:Voxel-SDF}
+\end{figure}
+
+The SDF approach in this essay will use a mix of software and hardware acceleration.
+Storing the whole scene as a SDF would consume a lot of memory because most of space is empty.
+Figure \ref{fig:Voxel-SDF} shows that storing a scene as a SDF would be wasteful because of empty space.
+This essay's method will enclose the object tightly. For example, in figure \ref{fig:Voxel-SDF}, an AABB would enclose a 2x2 tightly packed SDF instead of 6x6 which has a lot of empty space.
+Hardware accelerated AABBs will enclose the SDFs to skip vast empty spaces in the scene.
+Only a certain amount of bits will be used to store the distance to the nearest surface in the SDF.
+Varying number of bits (2, 4, 8) will be used to compare the performance of the SDF approach.
+Additionally, ray marching is not hardware accelerated, so it will be written in software.
+
 \subsection{Other Algorithms}
 
 \section{Memory Consumption}
