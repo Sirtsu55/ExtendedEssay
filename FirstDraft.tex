@@ -1,9 +1,11 @@
 \documentclass[12pt]{article}
 \usepackage{graphicx}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
 \usepackage[style=alphabetic, backend=biber]{biblatex}
+
 \graphicspath{ {./images/} }
 
-\addbibresource{figures.bib}
 \addbibresource{references.bib}
 
 % Preamble
@@ -23,6 +25,9 @@
 
 % Table of Contents
 \tableofcontents
+\clearpage
+
+
 \clearpage
 
 \section{Motivation}
@@ -52,7 +57,7 @@ acceleration. Due to those limitations, it was only used in non-real-time
 applications such as film production and pre-rendered graphics. Hardware
 acceleration ray tracing was introduced in 2018 by Nvidia. Since then, ray
 tracing has been possible in real-time and further supported by AMD and
-Intel GPUs. This has allowed real-time applications to leverage ray-tracing
+Intel GPUs. This has allowed real-time applications to leverage ray-tracing.
 
 \subsection{Voxels}
 
@@ -96,14 +101,14 @@ Whenever a ray intersects with a surface, the point of intersection is given by 
 
 where $I(t)$ is the intersection function of the surface. To locate the point of intersection,
 solving for $t$ is necessary by equating the ray equation with the intersection function. 
-If there are negative solutions for $t$, then the ray intersects with the surface. However, 
-if $t$ is negative, then the intersection is opposite the direction of the ray, which is not usually desired,
-so negative solutions are ignored. The closest hit is desired, so the smallest positive $t$ is chosen.
+If there are solutions for $t$, then the ray intersects with the surface. However, 
+if $t$ is negative, then the intersection is opposite to the direction of the ray, which is not desired,
+hence negative solutions are discarded. The closest hit is usually desired thus smallest non-negative $t$ is chosen.
 
-The intersection test has to happen for every object in the scene to determine the closest intersection.
-This is computationally expensive for large scenes, so acceleration structures (AS) are used to decrease the number of intersection tests significantly.
-These structures are usually bounding volume hierarchies (BVH) that subdivide the scene into smaller parts until the smallest primitives are reached.
-
+Without any optimization algorithms, the intersection test has to happen for every primitive in the scene to determine the closest intersection. Primitives are smallest building blocks of the scene, for example triangles, spheres, and cubes.
+Computing intersection tests for every primitive is computationally expensive for large scenes, so acceleration structures (AS) are used to decrease the number of intersection tests significantly.
+These structures are usually bounding volume hierarchies (BVH) that subdivide the scene into smaller parts until the smallest primitives are reached \parencite{NVIDIA:Raytracing}.
+This method logarithmically decreases the number of intersection tests like a binary search algorithm.
 \begin{figure}[h]
     \includegraphics[scale=0.22]{BVH-Visualization}
     \caption{
@@ -113,35 +118,82 @@ These structures are usually bounding volume hierarchies (BVH) that subdivide th
     \label{fig:BVH-Visualization}
 \end{figure}
 
-When a ray enters a bounding volume, the algorithm only has to test for intersections with the objects in that volume, which is much efficient.
 The BVH is a non-trivial tree structure that is constructed every object in the scene and requires a lot of memory, because
 it stores the volumes in addition to the objects.
+When a ray enters a bounding volume, it is guaranteed that only the primitives inside the bounding volume are potential hits.
+If the ray does not hit any primitives inside the bounding volume, then the ray goes to $n-1$ level of the hierarchy and continues
+to search for hits. This is repeated until the ray hits a primitive or the ray exits the scene.
 
 \subsection{Ray Tracing Algorithm}
 
 The ray tracing algorithm is a recursive algorithm that calculates the color of a pixel by tracing rays into the scene.
-The scene has a virtual camera that acts like a real camera capturing photons but instead of capturing photons, it shoots rays
-into the scene.
-This is because a light source emits photons in unmeasurable quantities and it is impossible to simulate all of them and a typical scene has multiple light sources.
-Additionally, not all photons reach the camera, so most of the computation is wasted.
-When tracing from the camera, the algorithm can simulate the exact paths but it only simulates paths that reach the camera.
-
+The scene has a virtual camera that shoots rays into the scene.
+When tracing from the camera, the algorithm can simulate the exact paths but it only simulates paths that reach the camera,
+which is efficient because it avoids simulating paths that do not reach the camera.
 The algorithm is as follows for each pixel in the image:
-\begin{enumerate}
-    \item Calculate a ray direction for the pixel.
-    \begin{itemize}
-        \item This is dependent on the field of view, focal length, and many other factors such as a real lens.
-    \end{itemize}
-    \item Trace the ray into the scene and find the {\bf closest} intersection. If there is no intersection, then the ray hits the background.
-          This could be the sky or a solid color that acts as ambient light.
-    \item If the surface is emissive (light source), then the ray's color is a combination of the light source and the colors of the surfaces it hit along the way and the algorithm stops.
-          If it is not emissive, then the ray absorbs some percentage of the surface's color and bounces in another
-          direction and the algorithm repeats from step 2.
-\end{enumerate}
 
-This algorithm is repeated thousands of times for each pixel in the image and the result is a photorealistic image.
-The reason it is repeated is that there can be thousands of paths that reach the camera bouncing from different combinations of surfaces.
-Even then, the image is an approximation because the algorithm fails to simulate all the paths that reach the camera.
+\begin{algorithm}[H]
+\caption{Ray Tracing Algorithm}
+\label{alg:TraceRay}
+\begin{algorithmic}[1]
+
+\State $Emissive \gets 0$
+\Procedure{TraceRay}{$direction, depth$}
+
+    \If{$depth = 0$}
+        \State \Return $0$
+    \EndIf
+
+    \State $closestHit \gets \infty$
+    \State $hitObject \gets null$
+
+    \For{$object$ in $scene$}
+        \State $hit \gets object.Intersect(direction)$
+        \If{$hit < closestHit$}
+            \State $closestHit \gets hit$
+            \State $hitObject \gets object$
+        \EndIf
+    \EndFor
+
+    \If{$closestHit = \infty$}
+        \State $Emissive \gets 1$ \Comment {Sky is a light source}
+        \State \Return $background$
+    \EndIf
+    \State $Emissive \gets hitObject.emissive$
+    \If {$hitObject.emissive$} \Comment {If the object is a light source}
+        \State \Return $hitObject.Color$
+    \EndIf
+
+    \State $newDirection \gets randomDirectionFromObject(hitObject)$
+
+    \State \Return $object.Color * TraceRay(newDirection, depth - 1)$
+
+\EndProcedure
+
+\For{$pixel$ in $image$}
+    \State $direction \gets pixelToDirection(pixel)$
+    \State $color \gets TraceRay(direction, maxDepth) * Emissive$
+    \State $image[pixel] \gets color$
+    \State $Emissive \gets 0$ \Comment{Reset Emissive}
+\EndFor
+
+\end{algorithmic}
+\end{algorithm}
+
+The pseudocode in Algorithm \ref{alg:TraceRay} shows a simplified recursive algorithm for ray tracing.
+It finds the closest hit in the scene and if the object is emissive (light source), then the pixel is illuminated.
+Note that if the path doesn't hit a light source, the path color is multiplied by 0, which results in a black pixel.
+
+This recursive algorithm is repeated thousands of times for each pixel and the result is an image.
+Even then, the image is an approximation of the real world because the algorithm only simulates a fraction of all the possible paths.
+
+\begin{figure}[h]
+    \begin{center}
+        \includegraphics[scale=0.22]{RayTracingImage}
+    \end{center}
+    \caption{Simplified visualization of the Algorithm \ref{alg:TraceRay}. \parencite{NVIDIA:Raytracing}}
+    \label{fig:RayTracingImage}
+\end{figure}
 
 \subsection{GPU Architecture}
 
@@ -155,11 +207,13 @@ Below are the two methods that will be compared in this essay.
 
 To use an AS it needs to be constructed for the objects in the scene.
 Unfortunately, acceleration structure generation is a black box in graphics APIs. 
-The user supplies the object's primitives and the GPU driver constructs it.
+The user supplies the object's primitives and the GPU driver constructs an AS.
 These primitives are usually triangles or axis aligned bounding boxes (AABB).
-AABBs are cuboids that are aligned in the x, y, and z axes.
+AABBs are cuboids that are aligned in the x, y, and z axes, hence the name axis aligned.
+GPUs that support hardware accelerated ray tracing are extremely optimized for triangles and AABB intersection tests.
+Even triangles are encosed in AABBs in a BVH.
 
-Cubes can be represented as AABBs, so voxels can be represented as AABBs.
+Cubes can be represented as AABBs, therefore voxels can be represented as AABBs.
 This is useful because the GPU can construct the AS without the user having to do it.
 However, the AABBs are not inteded to use as voxels, instead they are a flexible way to enclose user defined objects.
 For example, a smooth sphere would not be possible to represent using triangles, but there 
@@ -169,14 +223,7 @@ This can be done for anything as long as it's enclosed in an AABB.
 Because of this, they are not optimized for the voxel use case, where there would be millions of
 densely packed AABBs in a scene.
 
-Additionally, the memory consumption is greater for AABBs than for voxels.
-AABBs need 2, 3D vectors to represent the minimum and maximum points of the cuboid.
-This is 6 floats or 24 bytes per AABB.
-If there is a scene with 1 million voxels, then the memory consumption would be 24MB.
-This may not sound like much, however the AS has extra AABBs for the hierarchy, which will add upto more memory.
-To do lighting calculations and other operations, the user would need to access the data inside the voxels.
-The graphics API does not allow accessing the data inside the AS, so the user would have to duplicate the data in memory.
-It is inefficient and wasteful to have two copies of the same data in memory.
+Additionally, 
 
 \begin{figure}[h]
     \begin{center}
@@ -198,7 +245,6 @@ Figure \ref{fig:ClosestHit-Approx} shows solving for the closest candiate withou
 This much more efficient than solving for the intersection and it ensures the closest candidate is chosen.
 After finding the closest candidate, the user can solve for the intersection and determine where the ray hits the voxel.
 
-
 \subsection{Signed Distance Fields}
 
 Signed distance fields (SDF) used to store distance information to the nearest surface. 
@@ -207,7 +253,7 @@ SDFs are used in ray marching which is a technique to render surfaces.
 Ray marching is a technique where the ray is stepped in small increments and the distance to the nearest surface is calculated.
 If the distance is less than a threshold, then the ray has hit the surface, this avoids expensive intersection tests for every object in the scene.
 However, the ray has to take steps through the scene which can add up to thousands of steps for a single ray.
-This may have worse performance if the signed distance field cannot skip large emptry spaces in the scene, thus
+This may have worse performance if the signed distance field cannot skip large empty spaces in the scene, thus
 requiring more steps to reach the surface.
 
 \begin{figure}[h]
@@ -227,14 +273,40 @@ Figure \ref{fig:Voxel-SDF} shows that storing a scene as a SDF would be wasteful
 This essay's method will enclose the object tightly. For example, in figure \ref{fig:Voxel-SDF}, an AABB would enclose a 2x2 tightly packed SDF instead of 6x6 which has a lot of empty space.
 Hardware accelerated AABBs will enclose the SDFs to skip vast empty spaces in the scene.
 Only a certain amount of bits will be used to store the distance to the nearest surface in the SDF.
-Varying number of bits (2, 4, 8) will be used to compare the performance of the SDF approach.
 Additionally, ray marching is not hardware accelerated, so it will be written in software.
-
-\subsection{Other Algorithms}
 
 \section{Memory Consumption}
 
+\subsection{Hardware Acceleration Structure Traversal}
+
+The memory consumption is greater for AABBs than for voxels.
+Unfortunately, the GPU requires AABBs to be used for hardware acceleration.
+AABBs need two 3D vectors to represent the minimum and maximum points of the cuboid.
+This is 6 floats or 24 bytes per AABB.
+If there is a scene with 1 million voxels, then the memory consumption would be 24MB.
+This may not sound like much, however the AS has extra AABBs for the hierarchy, which will add upto more memory.
+To do lighting calculations and other operations, the user would need to access the data inside the voxels.
+The graphics API does not allow accessing the data inside the AS, so there would be duplicated data.
+One for the AS and one for the user to access.
+
+\subsection{Signed Distance Fields}
+
+SDF memory consumption is notably less than AABBs.
+They can be represented as a 3D grid. Each cell in the grid stores the distance to the nearest surface.
+Therefore, cells with a distance of 0 are on the surface. There is no need to store the positions since
+every cell is a fixed distance from each other. and the user can calculate the position of the cell by using the cell's x, y, z index in the 3D grid.
+This saves 24 bytes per voxel, when compared to AABBs and there is no need to maintain a hierarchy containing extra AABBs.
+Additionally, there is no need to duplicate the data since the user can access the data directly.
+SDFs take up as much space as the user needs to store the scene. The SDF requires the distance and user defined extra voxel information.
+The extra information can be an index to another array containing the material. 
+The drawback is that the empty spaces also take as much space.
+However, by minimizing emptry space and tightly enclosing the object, the memory consumption can be reduced further.
+Partitioning a model further into smaller SDFs can reduce memory consumption as that would reduce the empty space.
+
 \section{Results}
+
+\subsection{Hardware Acclerated Method}
+\subsection{Signed Distance Fields Method}
 
 \section{Conclusion}
 
