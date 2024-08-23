@@ -65,12 +65,12 @@ Intel GPUs. This has allowed real-time applications to leverage ray-tracing such
 
 Voxels are a way to represent 3D data. It is similar to pixels in 2D images,
 but in 3D space. Essentially, voxels are cubes that are located in 3D space.
-They are used in medical imaging, simulations, and video games; they have
+They are used in visualization applications, and video games; they have
 similar applications to ray tracing. Voxels are convenient, because they represent
 volumetric data, which is difficult to represent with traditional with polygons that the GPU is designed to handle.
-Terrain, and medical imaging data are examples of volumetric data. 
-The sensors uniformly sample the 3D space and store the data in a 3D grid,
-making voxels a perfect representation of the data.
+Environment scans and medical imaging data are examples of volumetric data.
+For example, LiDAR sensors are used to scan the environment and create volumetric data.
+This data can be represented as voxels, and then used in simulations or visualizations.
 Each voxel can contain data, such as color, or density captured from the sensors,
 which can be utilized in simulations or visualizations.
 
@@ -81,8 +81,8 @@ Real-time applications considered are video games, and visualizations that utili
 These are the factors that will be considered when evaluating the possibility:
 \begin{itemize}
     \itemsep0em
-    \item Can the hardware a reasonable number of voxels? (1-10 million)
-    \item Does the memory consumption exceed the available memory on the GPU? (8GB)
+    \item Can it handle a reasonable number of voxels? (3-15 Million)
+    \item Does it exceed the memory budget? (4GB)
 \end{itemize}
 
 Moreover, this essay attempts to analyze the GPU hardware bottlenecks that limit the performance of voxel ray tracing.
@@ -327,18 +327,20 @@ To do lighting calculations and other operations, the user would need to access 
 The graphics API does not allow accessing the data inside the AS, so there would be duplicated data.
 
 \subsection{Data Collection}
-
-Data collection to analyze the performance is done by measuring the frame time and frames per second.
+Data collection to analyze the performance is done by measuring the frame time and frames per second (FPS)
 The following configuration is run on 3 different scenes with varying number of voxels.
+These scenes are real world scans that were in the form of polygons.
+They were converted to voxels by using FileToVox software \parencite{Github:FileToVox}.
 
 \begin{itemize}
     \itemsep0em
-    \item New York City: 4.3 million voxels
-    \item Operating Room: 5.2 million voxels
-    \item Church: 13.6 million voxels
+    \item New York City: 4.3 million voxels \parencite{SketchFab:NewYorkCity}
+    \item Operating Room: 5.2 million voxels \parencite{SketchFab:OperatingRoom}
+    \item Church: 13.6 million voxels \parencite{SketchFab:Church}
 \end{itemize}
 
 The ray tracing algorithm is run for 4096 frames, and the average frame time is calculated.
+Each ray can at most bounce 4 times, so the recursion depth is 4.
 From the average frame time, the average frames per second is calculated, by $FPS = \frac{1}{Average Frame Time}$.
 
 Two methods of intersection tests are used:
@@ -348,10 +350,6 @@ Two methods of intersection tests are used:
     \item Approximate Intersection: The closest hit is approximated and the exact intersection is calculated in the closest hit stage.
     Described in Section \ref{sec:OptimizingIntersection}.
 \end{itemize}
-
-Additionally, NVIDIA's Nsight Graphics is used to analyze the performance of the GPU.
-This allows to analyze specific instructions that are taking the most time.
-The memory consumption will be analyzed in the same tool, to see accurate memory usage.
 
 \section{Results}
 
@@ -365,7 +363,7 @@ and the driver acts as a middleman between the API and the GPU Hardware.
 The code used in this essay has been written on Vulkan, and DirectX 12 graphics APIs,
 and the NVIDIA's GPU driver has been found not to conform strictly to either of the specifications.
 
-Wrong information about the ABB that was hit is passed to the intersection and closest hit stages.
+Wrong information about the AABB that was hit is passed to the intersection and closest hit stages.
 The driver is merging voxels that are close to each other, into a single wide AABB.
 The user does not know that the AABB was merged and expects it to act as individual voxels.
 It is important to note, that the driver may merge the AABBs for optimization, but it should still act as if the AABBs were not merged.
@@ -378,7 +376,7 @@ It is important to note, that the driver may merge the AABBs for optimization, b
         The expected behavior compared to the real behavior.
         }
         \label{fig:Voxel-Merging}
-    \end{figure}
+\end{figure}
     
 The merged AABB in Figure \ref{fig:Voxel-Merging} is blue,
 because the driver reports that the primitive hit is the blue voxel even for the right side of the merged AABB.
@@ -387,27 +385,48 @@ The exact intersection method does not suffer from this issue, however the appro
 For the sake of this essay, the issue is ignored because the issue has been reported to developers.
 The usability for real-time applications is impacted severely by this issue if not resolved.
 This issue is not unique to this essay, as few developers have reported the same issue.
+\parencite{NVIDIA:AABB-Merging}
 
-% TODO: add source to nvidia forums
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[scale=0.25]{NewYorkCity-Merging}
+        \smallbreak
+        \includegraphics[scale=0.25]{OperationRoom-Merging}
+    \end{center}
+    \caption{
+        Artifacts caused by the driver merging the AABBs.
+        }
+        \label{fig:Scenes-Merging}
+\end{figure}
+
+\subsection{Stability}
+
+While collecting data, the stability of the GPU was suboptimal. The GPU crashed multiple times
+during data collection and after the data was collected.
+The crashes were severe, as the system had to be restarted. Most of the crashes occured
+when collecting data for the Church and Operating Room. It would end prematurely before the 4096 frames were rendered.
+The CPU was going through 4096 frames, however, the GPU was not presenting the frames to the screen.
+The data below are from the runs that were not followed by a crash and did not cause any crashes.
+
 
 \subsection{Performance Data}
 
 \begin{table}[H]
     \centering
-    \caption{Exact Intersection Performance Data }
+    \caption{Exact Intersection Performance Data}
     \vspace{0.5cm}
     \label{tab:Exact-Performance-Data}
     \begin{tabular}{c||c|c|c|}
      Scene (voxels)             & Frame Time (ms)    & Frame Per Second \\ \toprule
     New York City (4.3 mil)     & 3.07               & 324              \\
     Operating Room (5.2 mil)    & 10.7               & 93               \\
-    Church                      & 11.0               & 91               \\
+    Church (13.6 mil)           & 11.0               & 91               \\
     \end{tabular}
 \end{table}
 
 \begin{table}[H]
     \centering
-    \caption{Approximate Intersection Performance Data }
+    \caption{Approximate Intersection Performance Data}
     \vspace{0.5cm}
     \label{tab:Approx-Performance-Data}
     \begin{tabular}{c||c|c|c|}
@@ -418,10 +437,37 @@ This issue is not unique to this essay, as few developers have reported the same
     \end{tabular}
 \end{table}
 
+% Memory NYC AS:                162725888
+% Memory NYC Buffer:            139198464
+% Memory Operating Room AS:     195952640
+% Memory Operating Room Buffer: 167706624
+% Memory Church AS:             513212416
+% Memory Church Buffer:         438829056
+
+\begin{table}[H]
+    \centering
+    \caption{Memory Consumption in MegaBytes}
+    \vspace{0.5cm}
+    \label{tab:Memory-Consumption}
+    \begin{tabular}{c||c|c|c|}
+    Scene (voxels)              & Accel. Structure  & Voxels        & Total Memory \\ \toprule
+    New York City (4.3 mil)     & 162               & 139           & 301          \\
+    Operating Room (5.2 mil)    & 195               & 167           & 362          \\
+    Church (13.6 mil)           & 513               & 438           & 951          \\
+    \end{tabular}
+\end{table}
 
 \subsection{New York City Scene}
 
-The performance is optimal for the New York City scene, with 4.3 million voxels.
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[scale=0.25]{NewYorkCity}
+    \end{center}
+    \caption{New York City Scene - Exact Intersection}
+    \label{fig:NewYorkCity}
+\end{figure}
+
+Performance is optimal for the New York City scene, with 4.3 million voxels.
 The exact intersection method proves to be faster than the approximate intersection method,
 this is good because the exact intersection method is more accurate. Furthermore, the driver
 issue discovered in the previous section does not affect the exact intersection method.
@@ -430,14 +476,86 @@ The scene is open, meaning there it is not enclosed, hence rays can escape the s
 hitting the sky. Most of the rays do not bounce more than once or twice, which is why the performance is high.
 
 The scene is a good representation of a real-time application, because it is open.
-Most visualization application are often focusing on a single object and the environment is open.
-For example, a medical imaging application would focus on a single organ and rest of the environment would be empty.
+Most visualization application are often focusing on a single object with nothing else in the scene.
+This scene could be used in a visualization application, because it is a scan of a real world location.
 The frame time also gives opportunities to add more work for the GPU, such as queing Artifical Intelligence (AI) tasks,
-or physics calculations.
+or physics calculations. The frame time is low enough to add more work and still maintain a high frame rate.
+
+\subsection{Operating Room Scene}
+
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[scale=0.25]{OperationRoom}
+    \end{center}
+    \caption{Operating Room Scene - Exact Intersection}
+    \label{fig:OperationRoom}
+\end{figure}
+
+Operating Room scene is a closed environment. In this scene, the frame time is considerably more than the New York City scene
+which was open. This is beacuse the rays in this scene bounce more because of the closed environment
+in which the rays have to bounce more to reach a light source. However, as previously mentioned 
+the ray terminates itself after reaching the maximum recursion depth of 4 if it has not
+hit a light source, so it is not bounding infinitely. Frame time of 10.7 for the exact intersection is reasonable and it 
+leaves 6 milli seconds for extra work if the target FPS is 60. However, in this scene the optimized
+intersection method is faster by 0.7 milliseconds. This scene also invokes the intersection stage
+more because the rays bounce more, hence leading to more intersection tests.
+
+Video games can have enclosed environments, and this scene is similar. The performance is optimal for this scene,
+as the frames per second is above 60. Video games usually have visual effects and more work for the GPU,
+which could lead to the frame rate lowering below 60. However, even considering the extra work,
+the frame rate is still considered playable for a video game.
+
+\subsection{Church Scene}
+
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[scale=0.25]{Church}
+    \end{center}
+    \caption{Church Scene - Exact Intersection}
+    \label{fig:Church}
+\end{figure}
+
+The church scene is the most complex scene with 13.6 million voxels. It is also enclosed like the operating room scene.
+The frame time is 11 milliseconds, even though the scene is more complex than the operating oom scene.
+Performance only differs by 0.3 milliseconds between this and the perating room scene, which is impressive.
+The performance is due to the hardware accelerated BVH traversal, because it reduces the number of intersection tests logarithmically.
+This means that the complexity of the scene does not linearly increase the frame time, which is excellent for real-time applications.
+Optimized intersection method is also faster by 0.3 milliseconds, which is in line with the operating room scene.
+
+
+Church scene is an example of an architectural visualization application, where the resolution of the geometry is high,
+and the scene is enclosed.
+
+\subsection{Memory Consumption}
+
+The memory consumption is reasonable and low even when the scene is complex.
+It is below 1GB for all the scenes, which is excellent and well within budget (4GB).
+This memory consumption is also taking into account the duplicated data for the voxels. 
+If there was no duplicated data, the memory consumption would have been approximately half of the total consumption in Table \ref{tab:Memory-Consumption}.
+
+
+The acceleration structure has extra memory consumption, because it is a tree structure
+with extra AABBs for the hierarchy. Intresting observation is that the 
+acceleration structure consumes 16-17\% more memory than the raw voxel data, 
+indepenedent of the scene complexity.
+
+It is obvious that the memory consumption grows in a linear fashion with the number of voxels,
+as the memory consumption is proportional to the number of voxels. 
 
 \section{Conclusion}
 
 
+The research question was: Is hardware accelerated voxel ray possible on consumer hardware for real-time applications?
+Results show that hardware accelerated voxel ray is possible on consumer hardware for real-time applications.
+It both handles a reasonable number of voxels that would be used in real-time applications and does not exceed the memory budget.
+The performance also leaves room for other tasks such as AI, physics calculations and post processing which are common in real-time applications.
+Increase in scene complexity does not scale linearly with the frame time, which allows for even more complex scenes
+to be ray traced than the ones used in this essay. Maybe even upwards of 100 million voxels in real time. 
+
+The optimization method in this essay does improve frame time in closed environments but not in open environments.
+However, the optimization method is not practical on NVIDIA GPUs because the driver does not conform to the specification.
+The difference 0.3-0.7 milliseconds is not significant. The optimization is worth only if the driver issue is resolved,
+because it is simpler.
 
 \printbibliography
 
