@@ -14,9 +14,12 @@
 \linespread{2}
 
 % Document Information
-\title{Ray Tracing Voxels with Hardware Acceleration in Real-Time \\
+\title{
+    Computer Science \\
     \vspace{1cm}
-    \large Is hardware accelerated voxel ray possible on consumer hardware for real-time applications? \\
+    Ray Tracing Voxels with Hardware Acceleration in Real-Time \\
+    \vspace{1cm}
+    \large Is hardware accelerated voxel ray tracing feasible on consumer hardware for real-time applications? \\
     \vspace{1cm}
     \large Word Count: 3939
     }
@@ -37,40 +40,41 @@
 
 \clearpage
 
-\section{Motivation}
-
-My first introduction to ray tracing was when NVIDIA announced their RTX-series GPUs in 2018.
-The idea of simulating light rays in real-time was unreal, and the results were stunning.
-I wanted to make my own hardware ray tracer, and so I was introduced to computer graphics.
-The aesthetics of voxel-based games have been fascinating and I wanted to combine the two.
-However, when researching, I found that there was no performance analysis of hardware accelerated voxel ray tracing.
-
 \section{Introduction}
 
 This essay is about the performance analysis of hardware accelerated voxel ray tracing.
+When researching about this topic, there was no performance analysis of hardware accelerated voxel ray tracing.
 In this essay, general overview of ray tracing and the process on hardware is explained,
 which is greatly simplified and does not cover all the details. Finally, the methodology of
 ray tracing voxels and the results of the performance analysis are presented.
 
 \subsection{Ray Tracing}
 
+The following has been discussed in \parencite{NVIDIA:Raytracing} and \parencite{NVIDIA:RTGems2}.
 Ray tracing is a method used to calculate where a given ray (line), intersects
 with the objects in an environment. It is used to simulate light rays because light rays
 travel in straight lines and interact with objects in the environment.
-Finding the intersection is essential to simulate the light bouncing off the objects.
-This process is utilized in film production, video games, optics, medical imaging,
-architectural visualization, and many other fields to simulate light rays.
-The term ray tracing is used interchangeably with path tracing. Path tracing uses ray tracing to simulate
-the path of light rays in an environment to create realistic lighting and shading.
+Finding the intersection is essential to simulate the light bouncing off the objects and this essay
+focuses on the performance of this process.
+This process is utilized in film production, video games, engineering,
+architectural visualization, and many other fields that simulate light.
+The term ray tracing is used interchangeably with path tracing.
+Path tracing is the process of simulating light paths in the environment where it utilizes ray tracing to find intersections.
 
-Ray tracing is a highly parallelizable process, thus it is perfectly suited for GPUs which have
-thousands of cores. However, due to how computationally expensive the
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[scale=0.22]{RayTracingImage}
+    \end{center}
+    \caption{Simplified visualization of the ray tracing process. Note that the rays originate from the camera whereas in reality the rays originate from the light source.}
+    \label{fig:RayTracingImage}
+\end{figure}
+
+Ray tracing is a highly parallelizable process perfectly suited for GPUs because each ray can be calculated independently of each other.
+However, due to how computationally expensive the
 process is, it is not feasible to do in real-time without dedicated hardware
 acceleration. Due to those limitations, it was only used in non-real-time
-applications such as film production. Hardware acceleration ray tracing was introduced in 2018 by NVIDIA.
-Since then, ray tracing has been possible in real-time and further supported by AMD and
-Intel GPUs. This has allowed real-time applications to leverage ray-tracing such as rendering
-applications, video games, and visualizations.
+applications such as film production. Hardware acceleration ray tracing was introduced in 2018 by NVIDIA \parencite{NVIDIA:DXR-Intro}.
+This has allowed real-time applications to leverage ray-tracing such as rendering applications, video games, and visualizations.
 
 \subsection{Voxels}
 
@@ -80,13 +84,21 @@ They are used in visualization applications, and video games.
 Voxels are a convenient data representation format, because they represent
 volumetric data, which is difficult to represent with traditional with polygons that the GPU is designed to handle.
 Environment scans and medical imaging data are examples of volumetric data.
-For example, LiDAR sensors are used to scan an environment and the sensors output volumetric data.
-These collections of points that the sensors output are called point clouds.
-Point clouds can be converted to voxels efficiently, because each point in 3D space can be represented as a voxel.
-Then it can be used in simulations or visualizations.
-Each voxel can contain data, such as color, or density captured from the sensors,
+For example, LiDAR sensors are used to scan an environment which output a collection of points in 3D space.
+These points can be converted to voxels efficiently, because each point in 3D space can be represented as a voxel \parencite{NOS:LiDAR}.
+
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[scale=0.4]{LiDAR}
+    \end{center}
+    \caption{LiDAR scan of an environment represented as voxels in 3D space. \parencite{NOS:LiDAR}}
+    \label{fig:LiDAR}
+\end{figure}
+
+It is utilized in simulations or visualizations, such as Figure \ref{fig:LiDAR}.
+Each voxel can contain data, such as color, or any relevant information,
 which can be utilized in simulations or visualizations. With the recent advancements in hardware acceleration
-ray tracing, voxel ray tracing has become hardware accelerated.
+ray tracing, voxel ray tracing has become hardware accelerated. \parencite[Chapter~37]{NVIDIA:RTGems2}
 
 \subsection{Research Question}
 
@@ -98,7 +110,7 @@ These are the factors that will be considered when evaluating the possibility:
 \begin{itemize}
     \itemsep0em
     \item Can it handle a reasonable number of voxels? (3-15 Million)
-    \item Does it exceed the memory budget? (4 GB)
+    \item Does it exceed the memory budget? (4 GB)
 \end{itemize}
 
 \section{Background Information}
@@ -190,22 +202,15 @@ The algorithm is as follows:
     \end{algorithmic}
 \end{algorithm}
 
-The pseudocode in Algorithm \ref{alg:TraceRay} shows a simple recursive algorithm for Path tracing.
+The pseudocode in Algorithm \ref{alg:TraceRay} shows a simple recursive algorithm for path tracing.
 It finds the closest hit in the scene using ray tracing, and if the object is emissive (light source), then the pixel is illuminated.
 Note that if the path doesn't hit a light source, the path color is multiplied by 0, which results in a black pixel.
+Figure \ref{fig:RayTracingImage} shows a visualization of the path tracing algorithm.
 
 This recursive algorithm is repeated thousands of times for each pixel and the result is an image.
 Even then, the image is an approximation of the real world because the algorithm only simulates a fraction of all the possible paths.
 In this essay, this is the algorithm that will be used to simulate the paths of the rays.
 This algorithm is split into multiple stages in the hardware acceleration pipeline.
-
-\begin{figure}[H]
-    \begin{center}
-        \includegraphics[scale=0.22]{RayTracingImage}
-    \end{center}
-    \caption{Simplified visualization of the Algorithm \ref{alg:TraceRay}. \parencite{NVIDIA:Raytracing}}
-    \label{fig:RayTracingImage}
-\end{figure}
 
 \subsection{Process of Ray Tracing on Hardware}
 In this section, the ray tracing process on hardware is explained.
@@ -267,16 +272,16 @@ The ray tracing pipeline is a series of steps that the GPU follows to use ray tr
 \end{figure}
 
 The ray tracing pipeline is shown in Figure \ref{fig:RayTracing-Pipeline}.
-Nearly all the steps in the pipeline are programmable, which allows the user to customize the pipeline.
+Nearly all the steps in the pipeline are programmable, which allows the programmer to customize the pipeline.
 Ray generation is the first step where the rays are generated from the camera in the correct direction and location.
 The hardware acceleration structure traversal is the most critical step because it requires the most computation.
 It is fully implemented in hardware and is not programmable until it reaches the leaf nodes of the BVH, where the intersection stage is invoked.
 For triangles primitives, the intersection stage is fixed in hardware, meaning it is not programmable.
-For AABB primitives, the stage is programmable, which allows the user to run their own intersection function.
-This is because, AABBs are meant to enclose user defined primitives.
+For AABB primitives, the stage is programmable, which allows the programmer to run their own intersection function.
+This is because, AABBs are meant to enclose programmer defined primitives.
 For example, a sphere can be enclosed in an AABB and the acceleration structure traversal is hardware accelerated
-until the enclosing AABB is hit. After hitting the AABB, the user defined intersection function for the sphere is invoked,
-allowing the user to run their own sphere intersection function \parencite{NVIDIA:BVH-Patent}.
+until the enclosing AABB is hit. After hitting the AABB, the programmer defined intersection function for the sphere is invoked,
+allowing the programmer to run their own sphere intersection function \parencite{NVIDIA:BVH-Patent}.
 The intersection function needs to report the value of $t$ in the equation $R(t) = I(t)$ if there is an intersection.
 The acceleration structure traversal and intersection stage are repeated until the closest hit is found,
 that is, the smallest non-negative $t$ value. Then the closest hit stage is invoked with the information
@@ -527,7 +532,7 @@ hitting the sky. Most of the rays do not bounce more than once or twice, which i
 The scene is a good representation of a real-time application, because it is open.
 Most visualization applications are often focusing on a single object with nothing else in the scene.
 This scene could be used in a visualization application or a video game, because it is based on a real world location.
-The frame time also gives opportunities to add more work for the GPU, such as queing Artifical Intelligence (AI) tasks,
+The frame time also gives opportunities to add more work for the GPU, such as queuing Artificial Intelligence (AI) tasks,
 or physics calculations. The frame time is low enough to add more work and still maintain a high frame rate.
 
 \subsection{Operating Room Scene}
@@ -593,7 +598,7 @@ as the memory consumption is proportional to the number of voxels.
 \section{Conclusion}
 
 
-The research question was: Is hardware accelerated voxel ray possible on consumer hardware for real-time applications?
+The research question was: Is hardware accelerated voxel ray tracing feasible on consumer hardware for real-time applications?
 Results show that hardware accelerated voxel ray is possible on consumer hardware for real-time applications.
 It both handles a reasonable number of voxels that would be used in real-time applications and does not exceed the memory budget.
 The performance also leaves room for other tasks such as AI, physics calculations and post-processing which are common in real-time applications.
