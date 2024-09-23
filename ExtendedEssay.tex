@@ -4,6 +4,7 @@
 \usepackage{algorithm}
 \usepackage{booktabs}
 \usepackage[style=alphabetic, backend=biber]{biblatex}
+\usepackage{setspace}
 
 \graphicspath{ {./images/} }
 
@@ -104,8 +105,9 @@ ray tracing, voxel ray tracing has become hardware accelerated. \parencite[Chapt
 
 Voxels are a convenient data representation format, and ray tracing is a powerful tool to simulate light rays,
 it will be interesting to see if it can be viable for use in real-time applications.
-Hence, the research question is: Is hardware accelerated voxel ray possible on consumer hardware for real-time applications?
+Hence, the research question is: Is hardware accelerated voxel ray tracing possible on consumer hardware for real-time applications?
 Real-time applications considered are video games, and visualizations that utilize volumetric data in the form of voxels.
+
 These are the factors that will be considered when evaluating the possibility:
 \begin{itemize}
     \itemsep0em
@@ -113,52 +115,27 @@ These are the factors that will be considered when evaluating the possibility:
     \item Does it exceed the memory budget? (4 GB)
 \end{itemize}
 
+The range of voxels considered are 3-15 million, because it represents a reasonable amount of data that can be visually shown on a screen.
+The memory budget is 4 GB, because most consumer GPUs that support hardware accelerated ray tracing have at least 4 GB of memory.
+
+Following sections will describe the ray tracing process, and the methodology used to evaluate the research question.
+After the methodology, the results of the performance analysis will be presented.
+
 \section{Background Information}
-
-\subsection{Mathematics of Ray Tracing}
-
-Mathematics in 3D applications utilize linear algebra heavily.
-In this essay it is recommended that the reader knows the basics of vectors.
-
-\subsubsection{The Ray Equation}
-
-A ray is defined by a point and a direction. The equation of a ray is given by:
-
-\begin{equation}
-    R(t) = {\bf\vec{o}} + t \cdot {\bf\vec{d}}
-\end{equation}
-
-where $\bf{\vec{o}}$ is the origin of the ray, $\bf{\vec{d}}$ is the direction of the ray, and $t$ is the distance from the origin.
-The function $R(t)$ gives the position of the ray at distance $t$ from the origin.
-With this equation, any point along the ray can be calculated.
-
-\subsubsection{The Intersection Function}
-
-Whenever a ray intersects with a surface, the point of intersection is given by the equation:
-
-\begin{equation}
-    R(t) = I(t)
-\end{equation}
-
-where $I(t)$ is the intersection function of the surface. To locate the point of intersection,
-solving for $t$ is necessary by equating the ray equation with the intersection function.
-If there are solutions for $t$, then the ray intersects with the surface. However,
-if $t$ is negative, then the intersection is opposite to the direction of the ray, which is not desired,
-hence negative solutions are discarded. The closest hit point is usually desired, thus smallest non-negative $t$ is chosen as
-the intersection point.
 
 \subsection{Path Tracing Algorithm}
 
-The path tracing algorithm is a recursive algorithm that calculates the color of a pixel by tracing rays into the scene from a virtual camera.
+To render an image using ray tracing, the path tracing algorithm is used, which can be extremely complicated depending on to what extent the light is simulated.
+This essay will use a simple path tracing algorithm, because the focus of the essay is on the performance of the hardware acceleration and not the shading.
+A recursive algorithm is used that calculates the color of a pixel by tracing rays into the scene from a virtual camera.
 This algorithm leverages ray tracing to simulate light rays in the scene.
-The algorithm is as follows:
 
 \begin{algorithm}[H]
     \caption{Path Tracing Algorithm}
     \label{alg:TraceRay}
-    \tiny
-    \begin{algorithmic}[0]
-
+    \small
+    \setstretch{1.25}
+    \begin{algorithmic}[1]
         \State $Emissive \gets 0$
         \Procedure{TraceRay}{$direction, depth$}
 
@@ -186,7 +163,7 @@ The algorithm is as follows:
         \State \Return $hitObject.Color$
         \EndIf
 
-        \State $newDirection \gets randomDirectionFromObject(hitObject)$
+        \State $newDirection \gets randomDirectionFromObject(hitObject)$ \Comment {Light can come from any direction to the surface}
 
         \State \Return $object.Color * TraceRay(newDirection, depth - 1)$
 
@@ -198,40 +175,40 @@ The algorithm is as follows:
         \State $image[pixel] \gets color$
         \State $Emissive \gets 0$ \Comment{Reset Emissive}
         \EndFor
-
     \end{algorithmic}
 \end{algorithm}
 
 The pseudocode in Algorithm \ref{alg:TraceRay} shows a simple recursive algorithm for path tracing.
-It finds the closest hit in the scene using ray tracing, and if the object is emissive (light source), then the pixel is illuminated.
-Note that if the path doesn't hit a light source, the path color is multiplied by 0, which results in a black pixel.
+When $TraceRay$ is called, it finds the closest hit in the scene using ray tracing.
+It also ensures that the ray does not bounce infinitely by checking the depth.
+The $object.Intersect(direction)$ method is the intersection function that returns the distance from the ray origin to the object's surface if an intersection is found.
+If the hit object is emissive (light source), then the path is illuminated by the light source, hence the color is returned. Note that if the path doesn't hit a light source, the path color is multiplied by 0, resulting in a black color. More paths are traced into random directions from the hit object to find possible paths that hit a light source. Multiplication by the object's color and the next ray's color are essential for physically accurate rendering. For example, if a red sphere and a green sphere are close to each other, the red sphere will reflect red light onto the green sphere, which will make the green sphere have hints of red color and vice versa.
+
+In practice, this algorithm is split into multiple stages for the hardware acceleration pipeline.
+The intersection stage is the most critical step that requires hardware acceleration.
+For-loop from line 8 to 14 is hardware accelerated in GPUs, because it computes the intersection, although the exact implementation is not disclosed by GPU vendors and is extremely more complex and efficient than the pseudocode. \parencite[Part~5]{NVIDIA:RTGems2}
+
 Figure \ref{fig:RayTracingImage} shows a visualization of the path tracing algorithm.
 
-This recursive algorithm is repeated thousands of times for each pixel and the result is an image.
-Even then, the image is an approximation of the real world because the algorithm only simulates a fraction of all the possible paths.
-In this essay, this is the algorithm that will be used to simulate the paths of the rays.
-This algorithm is split into multiple stages in the hardware acceleration pipeline.
+Although not in the pseudocode, this recursive algorithm is repeated many times for each pixel each frame. The result is a fairly noisy image, because most of the rays do not hit a light source. To reduce the noise, denoising algorithms are used that are not covered in this essay. These algorithms are further explained in \parencite{NVIDIA:RTGems2}.
+
+This is approximately the algorithm used in this essay, however the actual implementation is more complex and implemented in a shading language (HLSL) designed for GPU hardware, which has 500+ lines of code.
 
 \subsection{Process of Ray Tracing on Hardware}
 In this section, the ray tracing process on hardware is explained.
 
 \subsubsection{Acceleration Structures}
 
-Without any optimization algorithms, the intersection function has to be solved for every primitive in the scene to determine the closest hit.
+Without any optimization algorithms, intersection tests have to be performed for every primitive in the scene to determine the closest hit for a ray.
 Primitives are the smallest building blocks of the scene. The GPU only accepts triangles and axis aligned bounding boxes (AABB) as primitives.
-AABBs are cuboids that are aligned in the x, y, and z axes.
-Each object may have thousands of primitives, and the scene may have millions of primitives.
+AABBs are cuboids of any size, hence perfect for representing voxels.
+This essay will use AABB interchangeably with voxels, because voxels are represented as AABBs in the GPU.
 
+Performing an intersection test for every primitive is impractical for scenes with millions of primitives, because each intersection tests require a significant amount of computation.
+Doing this for millions of primitives, for millions of pixels, for every frame is not practical.
 
-Solving the intersection function for every primitive is computationally expensive for scenes with millions of primitives.
-The time complexity to find the closest hit is $O(n)$, where $n$ is the number of primitives.
-This has to be done for every pixel, and for each pixel the ray may bounce multiple times.
-This is not feasible for real-time applications because of the time complexity.
-
-
-Hence, acceleration structures (AS) are used to reduce the number of times the intersection function is solved.
+To mitigate this problem, Acceleration structures (AS) are used to reduce the number of times the intersection tests are performed.
 These structures are usually bounding volume hierarchies (BVH) that subdivide the scene into smaller parts until the smallest primitives are reached \parencite{NVIDIA:Raytracing}.
-Bounding volumes are AABBs that enclose the primitives in the scene.
 
 \begin{figure}[H]
     \includegraphics[scale=0.22]{BVH-Visualization}
