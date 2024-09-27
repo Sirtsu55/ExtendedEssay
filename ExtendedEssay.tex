@@ -22,7 +22,7 @@
     \vspace{1cm}
     \large Is hardware accelerated voxel ray tracing feasible on consumer hardware for real-time applications? \\
     \vspace{1cm}
-    \large Word Count: 3939
+    \large Word Count: 3975
     }
 \author{}
 \date{2024}
@@ -44,7 +44,8 @@
 \section{Introduction}
 
 This essay is about the performance analysis of hardware accelerated voxel ray tracing.
-When researching about this topic, there was no performance analysis of hardware accelerated voxel ray tracing.
+When researching about this topic, there was no performance analysis of hardware accelerated voxel ray tracing beforehand.
+
 In this essay, general overview of ray tracing and the process on hardware is explained,
 which is greatly simplified and does not cover all the details. Finally, the methodology of
 ray tracing voxels and the results of the performance analysis are presented.
@@ -105,18 +106,29 @@ ray tracing, voxel ray tracing has become hardware accelerated. \parencite[Chapt
 
 Voxels are a convenient data representation format, and ray tracing is a powerful tool to simulate light rays,
 it will be interesting to see if it can be viable for use in real-time applications.
-Hence, the research question is: Is hardware accelerated voxel ray tracing possible on consumer hardware for real-time applications?
+Hence, the research question is: {\bf Is hardware accelerated voxel ray tracing feasible on consumer hardware for real-time applications? }
 Real-time applications considered are video games, and visualizations that utilize volumetric data in the form of voxels.
 
-These are the factors that will be considered when evaluating the possibility:
+Writing an application to analyze this research, requires a deep understanding of the hardware, memory, graphics application programming interfaces (GAPI), graphics programming languages, debugging, etc.
+GAPIs allow communication between the application and the GPU.
+The GAPIs are designed for industry professionals with years of experience working with GPUs, hence are complex.
+Furthermore, debugging is non-trivial, because the algorithms are executed on the GPU, which cannot be debugged with traditional debugging tools.
+Understanding all of these topics comfortably may require years of experience. Writing 3000+ lines of code was required to conduct this research, without accounting for rewrites of algorithms, debugging, and testing.
+
+These are the factors that will be considered when evaluating the feasibility:
 \begin{itemize}
     \itemsep0em
-    \item Can it handle a reasonable number of voxels? (3-15 Million)
-    \item Does it exceed the memory budget? (4 GB)
+    \item Can it handle a reasonable number of voxels? (3-15 Million) in real-time?
+    \item Does it exceed the memory budget? (1 GB)
 \end{itemize}
 
 The range of voxels considered are 3-15 million, because it represents a reasonable amount of data that can be visually shown on a screen.
-The memory budget is 4 GB, because most consumer GPUs that support hardware accelerated ray tracing have at least 4 GB of memory.
+The performance target is 60+ frames per second (FPS), or below 16.67 milliseconds per frame for the scenes, which is considered
+smooth and interactive for real-time applications.
+
+Most consumer GPUs have at least 4 GB of memory, hence a memory budget of 1 GB is reasonable while still leaving memory for other tasks than rendering.
+For example, Artificial Intelligence (AI) tasks are common that requires abundant memory.
+
 
 Following sections will describe the ray tracing process, and the methodology used to evaluate the research question.
 After the methodology, the results of the performance analysis will be presented.
@@ -134,7 +146,7 @@ This algorithm leverages ray tracing to simulate light rays in the scene.
     \caption{Path Tracing Algorithm}
     \label{alg:TraceRay}
     \small
-    \setstretch{1.25}
+    \setstretch{1.2}
     \begin{algorithmic}[1]
         \State $Emissive \gets 0$
         \Procedure{TraceRay}{$direction, depth$}
@@ -181,18 +193,17 @@ This algorithm leverages ray tracing to simulate light rays in the scene.
 The pseudocode in Algorithm \ref{alg:TraceRay} shows a simple recursive algorithm for path tracing.
 When $TraceRay$ is called, it finds the closest hit in the scene using ray tracing.
 It also ensures that the ray does not bounce infinitely by checking the depth.
-The $object.Intersect(direction)$ method is the intersection function that returns the distance from the ray origin to the object's surface if an intersection is found.
-If the hit object is emissive (light source), then the path is illuminated by the light source, hence the color is returned. Note that if the path doesn't hit a light source, the path color is multiplied by 0, resulting in a black color. More paths are traced into random directions from the hit object to find possible paths that hit a light source. Multiplication by the object's color and the next ray's color are essential for physically accurate rendering. For example, if a red sphere and a green sphere are close to each other, the red sphere will reflect red light onto the green sphere, which will make the green sphere have hints of red color and vice versa.
+The $object.Intersect(direction)$ method is the intersection function that returns the intersection point if the ray hits the object.
+If the hit object is emissive (light source), then the path is illuminated by the light source, hence the color is returned.
+Note that if the path doesn't hit a light source, the path color is multiplied by 0, resulting in a black color. More paths are traced into random directions from the hit object to find possible paths that hit a light source. Multiplication by the object's color and the next ray's color are essential for physically accurate rendering. For example, if a red sphere and a green sphere are close to each other, the red sphere will reflect red light onto the green sphere, which will make the green sphere have hints of red color and vice versa.
+Figure \ref{fig:RayTracingImage} shows a visualization of the path tracing algorithm.
+Although not in the pseudocode, this recursive algorithm is repeated many times for each pixel each frame, resulting in a realistic image.
+The algorithm is approximately the algorithm used in this essay, however the actual implementation is more complex and implemented in a graphics programming language (HLSL), which has 500+ lines of code.
 
 In practice, this algorithm is split into multiple stages for the hardware acceleration pipeline.
-The intersection stage is the most critical step that requires hardware acceleration.
-For-loop from line 8 to 14 is hardware accelerated in GPUs, because it computes the intersection, although the exact implementation is not disclosed by GPU vendors and is extremely more complex and efficient than the pseudocode. \parencite[Part~5]{NVIDIA:RTGems2}
-
-Figure \ref{fig:RayTracingImage} shows a visualization of the path tracing algorithm.
-
-Although not in the pseudocode, this recursive algorithm is repeated many times for each pixel each frame. The result is a fairly noisy image, because most of the rays do not hit a light source. To reduce the noise, denoising algorithms are used that are not covered in this essay. These algorithms are further explained in \parencite{NVIDIA:RTGems2}.
-
-This is approximately the algorithm used in this essay, however the actual implementation is more complex and implemented in a shading language (HLSL) designed for GPU hardware, which has 500+ lines of code.
+The intersection function is the most critical function for achieving real-time ray tracing.
+For-loop from line 8 to 14 in Algorithm \ref{alg:TraceRay} is hardware accelerated in GPUs, because it computes the intersection, although the exact implementation is not disclosed by GPU vendors and is more complex and efficient than the pseudocode. \parencite[Part~5]{NVIDIA:RTGems2}
+This will be discussed in the next section.
 
 \subsection{Process of Ray Tracing on Hardware}
 In this section, the ray tracing process on hardware is explained.
@@ -220,25 +231,25 @@ These structures are usually bounding volume hierarchies (BVH) that subdivide th
     \label{fig:BVH-Visualization}
 \end{figure}
 
-The BVH is a non-trivial tree structure that is constructed for every object in the scene and requires more memory than the raw primitive data.
+The BVH is a tree structure that is constructed for every object in the scene and requires more memory than the raw primitive data.
 When a ray enters a bounding volume (box), it is guaranteed that only the primitives inside the bounding volume are potential hits.
-If the ray does not hit any primitives inside the bounding volume, then the ray goes to the previous bounding volume in the hierarchy and continues
+If the ray does not hit any primitives inside the bounding volume, then the ray goes to the root bounding volume in the hierarchy and continues
 to search for hits. This is repeated until the ray hits a primitive or exits the scene.
-This method logarithmically decreases the number computation required to find the closest hit.
-Binary search can be compared to this method, because binary search also divides the search space into two parts until the target is found.
-The time complexity of BVH traversal has a logarithmic term, which greatly reduces the time complexity of the intersection function
-when the scene is complex. The worst case time complexity is still $O(n)$ if everything is in the same bounding volume,
-however on average, the time complexity is bound to be logarithmic. GPU vendors do not disclose the exact implementation of the BVH traversal,
+This method greatly reduces the number of intersection tests that need to be performed, because the search space is divided into smaller parts.
+Binary search is comparable to this method, because binary search also divides the search range into half until the target is found.
+The time complexity of BVH traversal has a logarithmic term, because of space subdivision \parencite[Chapter~16]{NVIDIA:RTGems2}.
+GPU vendors do not disclose the exact implementation of the BVH traversal,
 but it can be assumed that the average traversal time complexity is logarithmic, because they
 have the incentive to optimize the traversal for their hardware.
 
 \subsubsection{Ray Tracing Pipeline}
 
-The ray tracing pipeline is a series of steps that the GPU follows to use ray tracing.
+The ray tracing pipeline consists of series stages that the GPU follows to use ray tracing.
+The term stages are used interchangeably with functions in this essay, because each stage is a function itself.
 
 \begin{figure}[H]
     \begin{center}
-        \includegraphics[scale=0.25]{RayTracing-Pipeline}
+        \includegraphics[scale=0.5]{RayTracing-Pipeline}
     \end{center}
     \caption{
         The Ray Tracing Pipeline.
@@ -249,28 +260,30 @@ The ray tracing pipeline is a series of steps that the GPU follows to use ray tr
 \end{figure}
 
 The ray tracing pipeline is shown in Figure \ref{fig:RayTracing-Pipeline}.
-Nearly all the steps in the pipeline are programmable, which allows the programmer to customize the pipeline.
-Ray generation is the first step where the rays are generated from the camera in the correct direction and location.
+Nearly all the stages in the pipeline are programmable, which allows the programmer to customize their ray tracing algorithm.
 The hardware acceleration structure traversal is the most critical step because it requires the most computation.
 It is fully implemented in hardware and is not programmable until it reaches the leaf nodes of the BVH, where the intersection stage is invoked.
-For triangles primitives, the intersection stage is fixed in hardware, meaning it is not programmable.
-For AABB primitives, the stage is programmable, which allows the programmer to run their own intersection function.
-This is because, AABBs are meant to enclose programmer defined primitives.
-For example, a sphere can be enclosed in an AABB and the acceleration structure traversal is hardware accelerated
-until the enclosing AABB is hit. After hitting the AABB, the programmer defined intersection function for the sphere is invoked,
-allowing the programmer to run their own sphere intersection function \parencite{NVIDIA:BVH-Patent}.
-The intersection function needs to report the value of $t$ in the equation $R(t) = I(t)$ if there is an intersection.
-The acceleration structure traversal and intersection stage are repeated until the closest hit is found,
-that is, the smallest non-negative $t$ value. Then the closest hit stage is invoked with the information
-about the hit location and the object that was hit.
-Closest hit stage is used to shade the hit point and even generate new rays into different directions to simulate light bouncing.
+Intersection stage reports if there is an intersection with the primitive in the bounding volume.
+For triangles primitives, the intersection stage is implemented in hardware.
+For AABB primitives, the stage is programmable, which this essay will utilize to intersect voxels.
 
-The anyhit stage is used to accept or discard hits. However, the anyhit stage is optional and can be omitted.
-If no hits are found, the miss stage is invoked.
-Miss stage is used to shade the background, usually the sky, if no hit is found.
+
+This is because, AABBs are meant to enclose programmer defined primitives, such as spheres or abstract shapes while also utilizing hardware acceleration.
+These programmer defined primitives are the leaf nodes of the BVH, thus hardware acceleration is leveraged until the leaf node is reached, where the programmer's intersection function is invoked
+\parencite{NVIDIA:BVH-Patent}.
+The acceleration structure traversal and intersection stage are repeated until the closest hit is found, because the first hit candidate could be occluded by another object.
+Other stages in the pipeline are not as critical as the intersection stage and used to calculate the color of the pixel, which is not the focus of this essay.
+
 \parencite{NVIDIA:RTGems2}
 
 \section{Methodology}
+
+Writing an application of this scope requires a deep understanding of the hardware, memory, graphics application programming interfaces (GAPI), graphics programming languages, debugging, etc.
+This is because the GAPI are designed for industry professionals with years of experience working with GPUs.
+Furthermore, debugging is non-trivial, because the algorithms are executed on the GPU, which cannot be debugged with traditional debugging tools.
+Understanding all of these topics comfortably may require years of experience.
+
+More than 3000+ lines of code are in the final implementation not accounting for rewrites of algorithms, debugging, and testing.
 
 \subsection{Utilizing Hardware Acceleration}
 
@@ -278,35 +291,21 @@ This essay will use AABBs as voxels, because the GPU only accepts either triangl
 Voxels are easily represented as AABBs, because both are cuboids.
 The other alternative, representing voxels as triangles is not practical. Voxels have 6 faces, 2 triangles
 are needed to represent each face, thus 12 triangles are needed to represent a voxel. This amounts to
-inefficent memory usage and computation. Usage of AABBs implies that the user has to program the intersection stage.
+inefficent memory usage and computation. Usage of AABBs implies that the programmer has to write the intersection function.
 
-Acceleration structure generation is a black box in graphics APIs, where
+Acceleration structure generation is a black box in GAPIs, where
 the primitives are supplied to the GPU and it constructs the AS. This is convenient to both the programmers and vendors, because
-vendors can optimize the AS construction and traversal for their hardware and users are ensured that the AS has optimal performance.
+vendors can optimize the AS construction and traversal for their hardware and developers are ensured that the AS has optimal performance.
 
 \subsection{Optimizing the Intersection Function}
 \label{sec:OptimizingIntersection}
 
-There are complications to representing voxels as AABBs, because AABBs are meant to be extremely flexible to
-enclose any user defined primitive. This section provides an optimization for the intersection stage,
+This section provides an optimization for the intersection stage,
 which involves approximating the closest hit.
 
-\begin{figure}[H]
-    \begin{center}
-        \includegraphics[scale=0.5]{ClosestHit-Ambigous}
-    \end{center}
-    \caption{
-        A scenario where the closest hit is not known by the GPU without invoking the user's intersection function.
-        Even though the larger AABB is closer to the ray origin, the smaller AABB has a closer intersection
-        with it's enclosed object.
-    }
-    \label{fig:ClosestHit-Ambigous}
-\end{figure}
-
-Figure \ref{fig:ClosestHit-Ambigous} shows a scenario where the GPU itself cannot determine the closest candidate just by
-taking into account the AABBs. Because of this, every AABB along the ray has to be tested for intersection, which
-means the intersection stage can be invoked multiple times. For maximum performance, the programmer should minimize
-the number of calculations performed in the intersection stage.
+According to the specifications, the GPU may invoke an intersection functions for every AABB along the ray in no particular order \parencite{DirectX:Specification}.
+This wastes computation for candidates that are not the closest hit.
+The intersection function must be performant as it can be invoked many times for every ray.
 
 \begin{figure}[H]
     \begin{center}
@@ -314,23 +313,20 @@ the number of calculations performed in the intersection stage.
     \end{center}
     \caption{
         Solving for closest hit candidate without a rigorous intersection test.
-        Instead, the distance from the ray origin to the AABB is calculated, and the closest candidate is selected.
+        Black voxels are the candidates hit along the ray.
+        Dotted lines represent the distance from the ray origin to the voxel center.
     }
     \label{fig:ClosestHit-Approx}
 \end{figure}
 
-Making the intersection stage efficient is trivial in this case.
-Finding an exact solution for every candidate is not necessary.
-The GPU will pick the candidate with the smallest $t$ value reported, which can be approximated.
-After the closest candidate is picked, the exact intersection point can be solved in the closest hit stage.
-Only one exact solution is calculated in this case, which is much more efficient than solving for every candidate.
-Figure \ref{fig:ClosestHit-Approx} shows solving for the closest candidate without an intersection test.
-In this case, since the voxels are never overlapping each other and of uniform size, the scenario in Figure \ref{fig:ClosestHit-Ambigous} is not possible.
-Using this assumption, the closest voxel along the ray is guaranteed to have the closest intersection.
-This method only involves calculating the distance from the ray origin to the voxel center and selecting the closest candidate.
-Fetching the voxel center is an array fetch and calculating the distance is a simple vector instruction, which is very fast in GPU hardware.
-The candidate with the smallest distance is selected as the closest hit, as described in the previous section.
-In the closest hit stage, there is enough information to calculate the exact intersection point.
+Figure \ref{fig:ClosestHit-Approx} shows solving for the closest candidate without a rigorous intersection test.
+Solving the exact intersection for every candidate is not necessary, because the primitives are voxels.
+Each voxel is a different distance from the ray origin, and the closest hit candidate is the voxel that is closest to the ray origin.
+
+Because of this, the distance from the ray origin to the voxel center is calculated for every candidate, and the candidate with the smallest distance is selected.
+After the closest candidate is found, the exact intersection can be calculated in the closest hit stage, because there is enough information to solve the exact intersection point.
+Only one exact solution is calculated instead of many.
+Fetching the voxel center is an array fetch and calculating the distance is a simple vector instruction, which is extremely fast.
 
 \subsection{Memory Consumption}
 
@@ -341,19 +337,18 @@ AABBs need two 3D vectors to represent the minimum and maximum points of the cub
 This is 6 floats or 24 bytes per AABB.
 If there is a scene with 1 million voxels, then the memory consumption would be 24 MB.
 This may not sound like much, however the AS has extra AABBs for the hierarchy, which will add up to more memory.
-To do lighting calculations and other operations, the user would need to access the data specific to the voxel.
-
-
-The graphics API does not allow accessing the data inside the AS. Thus, the user has to duplicate the data for the voxels in a separate
+To do lighting calculations and other operations, the programmer would need to access the data specific to the voxel.
+The GAPI does not allow accessing the data inside the AS. Thus, the programmer has to duplicate the data for the voxels in a separate
 memory location, which will add up to roughly double the memory consumption.
+This depletes the memory budget unnecessarily for applications on a tight memory budget.
 
 \subsection{Data Collection}
 
-Data collection to analyze the performance is done by measuring the frame time and frames per second (FPS).
+Data collection to analyze the performance is done by measuring the frame time, frames per second (FPS), and memory consumption.
 There are 3 different scenes with varying number of voxels to draw conclusions from.
-These scenes are real world locations or 3D scans of the environment that were in the form of polygons, because 3D model sharing
-is universally done in the form of polygons.
-The scenes were converted to voxels by using FileToVox software \parencite{Github:FileToVox}.
+These scenes are 3D scans of the real-world location that were in the form of polygons, because 3D model sharing
+is universally done in the form of polygons. Real-world locations are chosen to represent practical applications utilizing
+voxels for visualization. The scenes were converted to voxels by using FileToVox software \parencite{Github:FileToVox}.
 The final code that is used in this essay can be found in the repository \citetitle{Github:FastVoxels} \parencite{Github:FastVoxels}.
 
 \begin{itemize}
@@ -365,9 +360,9 @@ The final code that is used in this essay can be found in the repository \citeti
 
 The ray tracing algorithm is run for 4096 frames, and the average frame time is calculated.
 Each ray can at most bounce 4 times, so the maximum recursion depth is 4.
-Rays can terminate beforehand if they hit a light source.
-From the average frame time, the average frames per second is calculated, by $FPS = \frac{1}{Average Frame Time}$,
-which gives the number of frames that can be rendered in a second.
+Rays can terminate before reaching the maximum recursion depth if they hit a light source or the sky.
+From the average frame time, the average frames per second (FPS) is calculated, by $FPS = \frac{1}{Average Frame Time}$,
+which gives the number of frames that is rendered in a second.
 
 Two methods of intersection tests are used:
 \begin{itemize}
@@ -377,22 +372,24 @@ Two methods of intersection tests are used:
           Described in Section \ref{sec:OptimizingIntersection}.
 \end{itemize}
 
+These methods are used to evaluate if the optimization yields any performance improvements compared to the exact intersection method.
+Approximate method may improve the performance thus feasibility in real-time applications.
+
 \section{Results}
 
-This essay's analysis is based upon NVIDIA 3060ti GPU on Windows 11 using DirectX 12.
+This essay's analysis is based upon NVIDIA RTX 3060ti GPU on Windows 11 using DirectX 12.
 Results may vary on different hardware and software configurations.
+The GPU is one of the most common consumer GPUs according to {\it Steam Hardware Survey} \cite{Steam:HardwareSurvey}.
 
 \subsection{Driver Conformance}
 
-Graphics APIs are high level interfaces that allow the user to interact with the GPU,
-and the driver acts as a middleman between the API and the GPU Hardware.
-The code used in this essay has been written on Vulkan, and DirectX 12 graphics APIs,
-and the NVIDIA's GPU driver has been found not to conform strictly to either of the specifications.
+GAPIs such as Vulkan and DirectX 12 have strict specifications that the driver must conform to.
+NVIDIA's GPU driver has been found not to conform strictly to either the Vulkan or DirectX 12 specification.
 
 Wrong information about the AABB that was hit is passed to the intersection and closest hit stages.
-The driver is merging voxels that are close to each other, into a single wide AABB.
-The user does not know that the AABB was merged and expects it to act as an individual AABB.
+The driver was merging voxels that were close to each other, into a single wide AABB.
 It is important to note, that the driver may merge the AABBs for optimization, but it should still act as if the AABBs were not merged.
+However, it behaved like a single wide AABB, which is illegal according to the specification \parencite{DirectX:Specification}.
 
 \begin{figure}[H]
     \begin{center}
@@ -407,23 +404,22 @@ It is important to note, that the driver may merge the AABBs for optimization, b
 The merged AABB in Figure \ref{fig:Voxel-Merging} is blue,
 because the driver reports that the primitive hit is the blue voxel even for the right side of the merged AABB.
 
-The exact intersection method does not suffer from this issue, but the approximate intersection does.
-For the sake of this essay, the issue is ignored because the issue has been reported to developers.
-The usability for real-time applications is severely impacted by this issue if not resolved.
-This issue is not unique to this essay, as few developers have reported the same issue.
 The exact intersection method is not affected by this issue.
-
-    [Note for Jarmo: I can go into greater detail about why it works for the exact intersection method, but not for the approximate intersection method. Is that worth it?]
-\parencite{NVIDIA:AABB-Merging}
+For the sake of this essay, the issue is ignored because the issue has been reported to NVIDIA, however,
+the usability of the approximate method is severely impacted by this issue if not resolved.
+This issue is not unique to this essay, as few developers have reported the same issue \parencite{NVIDIA:AABB-Merging}.
+The code used in this essay has been written on Vulkan, and DirectX 12 GAPIs, and the issue was present in both.
+Rewriting for a different GAPI was a monumental task, as the application required a complete rewrite of the C++ code.
 
 \begin{figure}[H]
     \begin{center}
-        \includegraphics[scale=0.25]{NewYorkCity-Merging}
+        \includegraphics[scale=0.25]{OperationRoom.png}
         \smallbreak
         \includegraphics[scale=0.25]{OperationRoom-Merging}
     \end{center}
     \caption{
-        Artifacts caused by the driver merging the AABBs.
+        Operating Room Scene - Exact Intersection (Top) and Approximate Intersection (Bottom).
+        Black voxels are artifacts from the merging issue, present only in the approximate intersection method.
     }
     \label{fig:Scenes-Merging}
 \end{figure}
@@ -435,58 +431,74 @@ during data collection and after the data was collected.
 The crashes were severe, as the system had to be restarted. Most of the crashes occurred
 when collecting data for the Church and Operating Room scenes. It would end prematurely before the 4096 frames were rendered.
 The CPU was going through 4096 frames, however, the GPU was not presenting the frames to the screen.
-The data below are from the runs that were not followed by a crash and did not cause any crashes.
-
+The data presented are from the runs that were not followed by a crash and did not cause any crashes.
+This is relevant for the feasibility in real-time applications, because the system should not crash during rendering.
 
 \subsection{Performance Data}
 
+The data presented is relevant to evaluate the feasibility based on aforementioned criteria.
+
+Formulas for calculating the changes are as follows:
+
+Table \ref{tab:Performance-Milliseconds}:
+$Change ~ (ms) = Approx - Exact$
+
+Table \ref{tab:Performance-Frames}:
+$Change ~ (\%) = \frac{Approx - Exact}{Exact} * 100$
+
+Table \ref{tab:Memory-Consumption}:
+$Change ~ (\%) = \frac{Accel. Struct. - Voxels}{Voxels} * 100$
+
 \begin{table}[H]
     \centering
-    \caption{Exact Intersection Performance Data}
+    \caption{Performance Data in Milliseconds. Lower is better.}
     \vspace{0.5cm}
-    \label{tab:Exact-Performance-Data}
+    \label{tab:Performance-Milliseconds}
     \begin{tabular}{c||c|c|c|}
-        Scene (voxels)           & Frame Time (ms) & Frame Per Second \\ \toprule
-        New York City (4.3 mil)  & 3.07            & 324              \\
-        Operating Room (5.2 mil) & 10.7            & 93               \\
-        Church (13.6 mil)        & 11.0            & 91               \\
+        Scene (voxels)           & Exact Int. & Approx Int. & Change (ms) \\ \toprule
+        New York City (4.3 mil)  & 3.07       & 3.53        & +0.46       \\
+        Operating Room (5.2 mil) & 10.7       & 10.0        & -0.7        \\
+        Church (13.6 mil)        & 12.5       & 12.4        & -0.1        \\
     \end{tabular}
 \end{table}
 
 \begin{table}[H]
     \centering
-    \caption{Approximate Intersection Performance Data}
+    \caption{Performance Data in Frames Per Second. Higher is Better}
     \vspace{0.5cm}
-    \label{tab:Approx-Performance-Data}
+    \label{tab:Performance-Frames}
     \begin{tabular}{c||c|c|c|}
-        Scene (voxels)           & Frame Time (ms) & Frame Per Second \\ \toprule
-        New York City (4.3 mil)  & 3.53            & 282              \\
-        Operating Room (5.2 mil) & 10.0            & 100              \\
-        Church (13.6 mil)        & 10.7            & 94               \\
+        Scene (voxels)           & Exact Int. & Approx Int. & Change (\%) \\ \toprule
+        New York City (4.3 mil)  & 324        & 282         & -13         \\
+        Operating Room (5.2 mil) & 93         & 100         & +7.5        \\
+        Church (13.6 mil)        & 80         & 81          & +1.3        \\
     \end{tabular}
 \end{table}
 
-% Memory NYC AS:                162725888
-% Memory NYC Buffer:            139198464
-% Memory Operating Room AS:     195952640
-% Memory Operating Room Buffer: 167706624
-% Memory Church AS:             513212416
-% Memory Church Buffer:         438829056
+% Approx NYC:                3.53 : 282
+% Approx Operation Room:     10.0 : 100
+% Approx Church:             12.4 : 81
+
+% Exact NYC:            3.07 : 324
+% Exact Operation Room: 10.7 : 93
+% Exact Church:         12.5 : 80
+
+% Memory NYC:                162725888 (AS) : 139198464 (Voxels)
+% Memory Operating Room :     195952640 (AS) : 167706624 (Voxels)
+% Memory Church:             513212416 (AS) : 438829056 (Voxels)
 
 \begin{table}[H]
     \centering
-    \caption{Memory Consumption in Megabytes}
+    \caption{Memory Consumption in Megabytes. Lower is Better}
     \vspace{0.5cm}
     \label{tab:Memory-Consumption}
-    \begin{tabular}{c||c|c|c|}
-        Scene (voxels)           & Accel. Structure & Voxels & Total Memory \\ \toprule
-        New York City (4.3 mil)  & 162              & 139    & 301          \\
-        Operating Room (5.2 mil) & 195              & 167    & 362          \\
-        Church (13.6 mil)        & 513              & 438    & 951          \\
+    \begin{tabular}{c||c|c|c|c|}
+        Scene (voxels)           & Voxels & Accel. Struct. & Total & Change (\%) \\ \toprule
+        New York City (4.3 mil)  & 139    & 162            & 301   & +16.5       \\
+        Operating Room (5.2 mil) & 167    & 195            & 362   & +16.7       \\
+        Church (13.6 mil)        & 438    & 513            & 951   & +17.1       \\
     \end{tabular}
 \end{table}
-
-\subsection{New York City Scene}
 
 \begin{figure}[H]
     \begin{center}
@@ -496,23 +508,6 @@ The data below are from the runs that were not followed by a crash and did not c
     \label{fig:NewYorkCity}
 \end{figure}
 
-Performance is excellent for the New York City scene, rendering 4.3 million voxels.
-The exact intersection method proves to be faster than the approximate intersection method.
-It is an interesting behavior, because the approximate intersection method has fewer
-instructions to execute, however the exact intersection method is faster.
-Furthermore, the driver issue discovered in the previous section does not affect the exact intersection method,
-which is another benefit of using the exact intersection method.
-The reason behind high performance for the New York City scene is because fewer rays are traced.
-The scene is open, meaning it is not enclosed, hence rays can escape the scene quickly,
-hitting the sky. Most of the rays do not bounce more than once or twice, which is why the performance is high.
-
-The scene is a good representation of a real-time application, because it is open.
-Most visualization applications are often focusing on a single object with nothing else in the scene.
-This scene could be used in a visualization application or a video game, because it is based on a real world location.
-The frame time also gives opportunities to add more work for the GPU, such as queuing Artificial Intelligence (AI) tasks,
-or physics calculations. The frame time is low enough to add more work and still maintain a high frame rate.
-
-\subsection{Operating Room Scene}
 
 \begin{figure}[H]
     \begin{center}
@@ -522,22 +517,6 @@ or physics calculations. The frame time is low enough to add more work and still
     \label{fig:OperationRoom}
 \end{figure}
 
-Operating Room scene is a closed environment. In this scene, the frame time is considerably more than the New York City scene
-which was open. This is beacuse the rays in this scene bounce more because of the closed environment
-in which the rays have to bounce more to reach a light source. However, as previously mentioned
-the ray terminates itself after reaching the maximum recursion depth of 4 if it has not
-hit a light source, so it is not bouncing infinitely. Frame time of 10.7 for the exact intersection is reasonable and it
-leaves 6 milliseconds for extra work if the target FPS is 60. However, in this scene the optimized
-intersection method is faster by 0.7 milliseconds. This scene also invokes the intersection stage
-more because the rays bounce more, hence leading to more intersection tests.
-
-Video games can have enclosed environments like this. The performance is optimal for this scene,
-as the frames rate is above 60. Video games usually have visual effects and more work for the GPU,
-which could lead to the frame rate decreasing below 60. However, even considering the extra work,
-the frame rate is still considered playable for a video game.
-
-\subsection{Church Scene}
-
 \begin{figure}[H]
     \begin{center}
         \includegraphics[scale=0.25]{Church}
@@ -546,53 +525,60 @@ the frame rate is still considered playable for a video game.
     \label{fig:Church}
 \end{figure}
 
-The church scene is the most complex scene with 13.6 million voxels. It is also enclosed like the operating room scene.
-The frame time is 11 milliseconds, even though the scene is more complex than the operating room scene.
-Performance only differs by 0.3 milliseconds between this and the operating room scene, which is impressive.
-The performance is due to the hardware accelerated BVH traversal, because it reduces the number of intersection tests logarithmically.
-This means that the complexity of the scene does not linearly increase the frame time, which is excellent for real-time applications.
-Optimized intersection method is also faster by 0.3 milliseconds, which is in line with the operating room scene.
 
-Church scene is an example of an architectural visualization application, where the resolution of the geometry is high,
-and the scene is enclosed. The performance is great, and leaves room for any extra work that needs to be done and still maintain a reasonable frame rate.
+\subsection{Analysis of Results}
 
-\subsection{Memory Consumption}
+The results show that performance is excellent for all three scenes as they meet and exceed the target frame rate of 60 FPS.
+Furthermore, the memory consumption is below 1 GB for all the scenes, which leaves memory for other tasks.
 
-The memory consumption is reasonable and low even when the scene is complex.
-It is below 1GB for all the scenes, which is excellent and well within budget (4 GB).
-This memory consumption is also taking into account the duplicated data for the voxels.
-If there was no duplicated data, the memory consumption would have been approximately half of the total consumption in Table \ref{tab:Memory-Consumption}.
+New York City scene has the lowest frame time of 3.07 ms for the exact intersection method.
+The scene has the least number of voxels (4.3 million), and is open, meaning the rays can escape the scene quickly, resulting in less rays traced and less intersection tests.
+Most of the rays bounce only once or twice before escaping the scene, resulting in low frame time.
+The approximate intersection method is 0.46 ms slower, which is contrary to the expectation that the approximate intersection method would be faster.
+This is a significant change, as FPS drops by 13\%, from 324 to 282.
+In the source code, the approximate intersection method has fewer instructions to execute, however the exact intersection method is faster.
+This would need further investigation to understand why the approximate intersection method is slower.
+Despite the surprising results, it is favorable that the exact intersection method is more performant, because it does not suffer from artifacts caused by the driver issue.
 
+Operating Room scene has only 1 million more voxels than the New York City scene, however the frame time for the exact intersection method is 10.7 ms, which is approximately 3 times slower in comparison.
+This is caused by the enclosed environment where the rays can not escape the scene, thus have to either hit a light source, or bounce until the maximum recursion depth is reached before terminating.
+Since the increase in frame time is not proportional to the increase in the number of voxels, it is evident that the closed environment increases the frame time significantly.
+Contrary to the New York City scene, the approximate intersection method is faster in the Operating Room scene by 0.7 ms.
+The optimized method does yield extra performance as the FPS increases by 7.5\%, from 93 to 100.
+This is evidence that the optimization method works, but may not be advantageous in all scenes.
 
-The acceleration structure has extra memory consumption, because it is a tree structure
-with extra AABBs for the hierarchy. Interesting observation is that the
-acceleration structure consumes 16-17\% more memory than the raw voxel data,
-regardless of the scene complexity.
+Church scene is the most complex scene with 13.6 million voxels. It is also enclosed like the operating room scene.
+The frame time is 12.5 ms, which is approximately 2 ms slower than the operating room scene, even though the scene has twice the number of voxels than the operating room scene.
+This proves that the frame time does not scale linearly with the number of voxels, thus acceleration structure traversal is extremely efficient.
+In this case, the approximate intersection method is only 0.1 ms faster, which is not significant and may be within the margin of error.
+Therefore, supporting the claim that the optimization may not perform better in all scenes.
 
-It is obvious that the memory consumption grows linearly with the number of voxels,
-as the memory consumption is proportional to the number of voxels.
+The memory consumption is reasonable and below 1 GB for all the scenes.
+However, it nearly crosses the 1 GB threshold for the Church scene with 951 MB.
+If there did not need to be duplicated data, the memory consumption would not have gotten close to 1 GB.
+An interesting observation is that the acceleration structure consumes 16-17\% more memory than the raw voxel data, regardless of the scene complexity.
+This is caused by the extra AABBs for the hierarchy in the acceleration structure.
+There is a linear relationship between the number of voxels and the memory consumption, which is expected.
+It is more than the expectation of 24 MB for 1 million voxels, because the voxels contain auxiliary data such as color.
 
 \section{Conclusion}
 
-
-The research question was: Is hardware accelerated voxel ray tracing feasible on consumer hardware for real-time applications?
-Results show that hardware accelerated voxel ray is possible on consumer hardware for real-time applications.
-It both handles a reasonable number of voxels that would be used in real-time applications and does not exceed the memory budget.
-The performance also leaves room for other tasks such as AI, physics calculations and post-processing which are common in real-time applications.
+Results show that hardware accelerated voxel ray is feasible on consumer hardware for real-time applications.
+It both handles a reasonable number of voxels that would be used in real-time applications and does not exceed the memory budget of 1 GB.
+The exceptional performance also leaves room for other tasks such as AI, physics calculations and post-processing which are common in real-time applications.
 Increase in the scene complexity does not scale linearly with the frame time, which allows for even more complex scenes
-to be ray traced than the ones used in this essay. Maybe even upwards of 100 million voxels in real time.
-However, when deploying real-time applications the stability of the GPU is a concern.
-Unless the stability improves, it is not practical to deploy real-time applications with high complexity scenes,
-because it is prone to crash the system.
+to be ray traced than the ones used in this essay, with looser constraints on the frame time and memory budget.
+However, unless the stability improves, it is not practical to build applications with high complexity scenes,
+because it is prone to severe crashes.
 
-The optimization method in this essay does improve frame time in closed environments but not in open environments.
-However, the optimization method is not practical on NVIDIA GPUs because the driver does not conform to the specification.
-The difference of 0.3-0.7 milliseconds measured is not significant. This may be because the driver is already optimizing the intersection stage by not invoking it for every candidate
-along the ray but only for few of the closest candidates. The optimization is only worthy if the driver issue is resolved, because it is simpler.
-Furthermore, the memory consumption is reasonable and well within budget for real-time applications.
+The optimization method in this essay does improve frame time, but not in all scenes, closed environments show improvement, while open environments do not.
+However, the difference is not significant, which may be caused by the driver optimizing and only invoking the intersection function for the closest few candidates.
+The approximate method is only preferable if the driver issue is resolved.
+Furthermore, the memory consumption is reasonable and within the budget, but can be further reduced,
+if GAPIs allowed access to the AABB data inside the acceleration structure, which would eliminate the need for duplicate data.
 
-Ultimately, the results show that hardware accelerated voxel ray is possible on consumer hardware for real-time applications,
-but not ready for use in applications due to instability and driver issues.
+Ultimately, the results show that hardware accelerated voxel ray is feasible on consumer hardware for real-time applications,
+and extremely performant, even for complex scenes, but stability issues need to be resolved for practical applications.
 
 \printbibliography
 
