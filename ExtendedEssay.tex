@@ -84,7 +84,7 @@ Voxels are a medium to represent 3 dimensional (3D) data. It is similar to pixel
 but in 3D space. Essentially, voxels are cubes that are located in 3D space.
 They are used in visualization applications, and video games.
 Voxels are a convenient data representation format, because they represent
-volumetric data, which is difficult to represent with traditional with polygons that the GPU is designed to handle.
+volumetric data, which is difficult to represent with traditional polygons that the GPU is designed to handle.
 Environment scans and medical imaging data are examples of volumetric data.
 For example, LiDAR sensors are used to scan an environment which output a collection of points in 3D space.
 These points can be converted to voxels efficiently, because each point in 3D space can be represented as a voxel \parencite{NOS:LiDAR}.
@@ -177,7 +177,7 @@ This algorithm leverages ray tracing to simulate light rays in the scene.
 
         \State $newDirection \gets randomDirectionFromObject(hitObject)$ \Comment {Light can come from any direction to the surface}
 
-        \State \Return $object.Color * TraceRay(newDirection, depth - 1)$
+        \State \Return $hitObject.Color * TraceRay(newDirection, depth - 1)$
 
         \EndProcedure
 
@@ -244,7 +244,7 @@ have the incentive to optimize the traversal for their hardware.
 
 \subsubsection{Ray Tracing Pipeline}
 
-The ray tracing pipeline consists of series stages that the GPU follows to use ray tracing.
+The ray tracing pipeline consists of series of stages that the GPU follows to use ray tracing.
 The term stages are used interchangeably with functions in this essay, because each stage is a function itself.
 
 \begin{figure}[H]
@@ -272,7 +272,7 @@ This is because, AABBs are meant to enclose programmer defined primitives, such 
 These programmer defined primitives are the leaf nodes of the BVH, thus hardware acceleration is leveraged until the leaf node is reached, where the programmer's intersection function is invoked
 \parencite{NVIDIA:BVH-Patent}.
 The acceleration structure traversal and intersection stage are repeated until the closest hit is found, because the first hit candidate could be occluded by another object.
-Other stages in the pipeline are not as critical as the intersection stage and used to calculate the color of the pixel, which is not the focus of this essay.
+Other stages in the pipeline are not as critical as the intersection stage and are used to calculate the color of the pixel, which is not the focus of this essay.
 
 \parencite{NVIDIA:RTGems2}
 
@@ -444,10 +444,10 @@ Table \ref{tab:Performance-Milliseconds}:
 $Change ~ (ms) = Approx - Exact$
 
 Table \ref{tab:Performance-Frames}:
-$Change ~ (\%) = \frac{Approx - Exact}{Exact} * 100$
+$Change ~ (\%) = \frac{Approx - Exact}{Exact} \times 100$
 
 Table \ref{tab:Memory-Consumption}:
-$Change ~ (\%) = \frac{Accel. Struct. - Voxels}{Voxels} * 100$
+$Change ~ (\%) = \frac{Accel. Struct. - Voxels}{Voxels} \times 100$
 
 \begin{table}[H]
     \centering
@@ -456,9 +456,9 @@ $Change ~ (\%) = \frac{Accel. Struct. - Voxels}{Voxels} * 100$
     \label{tab:Performance-Milliseconds}
     \begin{tabular}{c||c|c|c|}
         Scene (voxels)           & Exact Int. & Approx Int. & Change (ms) \\ \toprule
-        New York City (4.3 mil)  & 3.07       & 3.53        & +0.46       \\
-        Operating Room (5.2 mil) & 10.7       & 10.0        & -0.7        \\
-        Church (13.6 mil)        & 12.5       & 12.4        & -0.1        \\
+        New York City (4.3 mil)  & 3.07       & 3.53        & $ +0.46 $   \\
+        Operating Room (5.2 mil) & 10.7       & 10.0        & $ -0.7  $   \\
+        Church (13.6 mil)        & 12.5       & 12.4        & $ -0.1  $   \\
     \end{tabular}
 \end{table}
 
@@ -469,9 +469,9 @@ $Change ~ (\%) = \frac{Accel. Struct. - Voxels}{Voxels} * 100$
     \label{tab:Performance-Frames}
     \begin{tabular}{c||c|c|c|}
         Scene (voxels)           & Exact Int. & Approx Int. & Change (\%) \\ \toprule
-        New York City (4.3 mil)  & 324        & 282         & -13         \\
-        Operating Room (5.2 mil) & 93         & 100         & +7.5        \\
-        Church (13.6 mil)        & 80         & 81          & +1.3        \\
+        New York City (4.3 mil)  & 324        & 282         & $ -13  $    \\
+        Operating Room (5.2 mil) & 93         & 100         & $ +7.5 $    \\
+        Church (13.6 mil)        & 80         & 81          & $ +1.3 $    \\
     \end{tabular}
 \end{table}
 
